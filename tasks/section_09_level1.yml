@@ -168,7 +168,8 @@
     - section9.1.14
 
 - name: 9.1.14 Invalid Executables
-  fail: "Investigate manually!"
+  fail:
+    msg: "Investigate manually!"
   when: item not in cis_9_1_14_exclude_list
   with_items: cis_9_1_14_output.stdout_lines
   tags:
