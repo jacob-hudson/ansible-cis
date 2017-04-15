@@ -1,4 +1,5 @@
 cis
+==================================
 [![Build Status](https://travis-ci.org/jacob-hudson/ansible-role-cis.svg?branch=master)](https://travis-ci.org/jacob-hudson/ansible-role-cis)
 
 A brief description of the role goes here.
