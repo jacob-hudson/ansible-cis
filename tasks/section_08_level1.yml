@@ -1,0 +1,96 @@
+---
+
+- name: 8.1 Set Warning Banner for Standard Login Services (Scored)
+  stat: path=/etc/{{ item }}
+  register: stats
+  with_items:
+    - motd
+    - issue
+    - issue.net
+  tags:
+    - scored
+    - section8.1
+
+- name: 8.1 Set Warning Banner for Standard Login Services (Scored)
+  file: name=/etc/motd state=absent
+  changed_when: false
+  with_items:
+    - stats.results
+  when: item.islnk is defined
+  tags:
+    - scored
+    - section8.1
+
+- name: 8.1 Set Warning Banner for Standard Login Services (Scored)
+  file: name=/etc/issue state=absent
+  changed_when: false
+  with_items:
+    - stats.results
+  when: item.islnk is defined
+  tags:
+    - scored
+    - section8.1
+
+- name: 8.1 Set Warning Banner for Standard Login Services (Scored)
+  file: name=/etc/issue.net state=absent
+  changed_when: false
+  with_items: stats.results
+  when: item.islnk is defined
+  become: True
+  become_user: root
+  tags:
+    - scored
+    - section8.1
+
+- name: 8.1 Set Warning Banner for Standard Login Services (Scored)
+  copy: src=etc/{{item}} dest=/etc/{{item}}
+  become: True
+  become_user: root
+  with_items:
+    - motd
+    - issue
+    - issue.net
+  tags:
+    - scored
+    - section8.1
+
+- name: 8.1 Set Warning Banner for Standard Login Services (Scored)
+  file: path=/etc/{{ item }} owner=root group=root mode=0644
+  with_items:
+    - motd
+    - issue
+    - issue.net
+  tags:
+    - scored
+    - section8.1
+
+- name: 8.2 Remove OS Information from Login Warning Banners (Scored)
+  replace: dest=/etc/{{ item }} regexp='\\r|\\v|\\s' replace='[CIS replaced]'
+  with_items:
+    - motd
+    - issue
+    - issue.net
+  tags:
+    - scored
+    - section8.2
+
+- name: 8.3 Determine if dconf is installed
+  stat: path=etc/dconf/db/gdm.d/01-banner-message
+  register: cis_8_3_dconf_stat
+  tags:
+    - scored
+    - section8.3
+
+- name: 8.3 Set GNOME Warning Banner (Not Scored)
+  template: src=01-banner-message.j2 dest=/etc/dconf/db/gdm.d/01-banner-message
+  when: cis_8_3_dconf_stat.stat.exists == true
+  tags:
+    - scored
+    - section8.3
+
+- name: 8.3 Enable GDM Banners
+  command: dconf update
+  when: cis_8_3_dconf_stat == true
+  tags:
+    - scored
+    - section8.3

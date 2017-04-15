@@ -1,0 +1,498 @@
+---
+
+- name: 9.1.2 Verify Permissions on /etc/passwd (Scored)
+  file: path=/etc/passwd mode=0644
+  tags:
+    - scored
+    - section9.1
+    - section9.1.2
+
+- name: 9.1.3 Verify Permissions on /etc/shadow (Scored)
+  file: path=/etc/shadow mode=0000
+  tags:
+    - scored
+    - section9.1
+    - section9.1.3
+
+- name: 9.1.4 Verify Permissions on /etc/gshadow (Scored)
+  file: path=/etc/gshadow mode=0000
+  tags:
+    - scored
+    - section9.1
+    - section9.1.4
+
+- name: 9.1.5 Verify Permissions on /etc/group (Scored)
+  file: path=/etc/group mode=0644
+  tags:
+    - scored
+    - section9.1
+    - section9.1.5
+
+- name: 9.1.6 Verify User/Group Ownership on /etc/passwd (Scored)
+  file: path=/etc/passwd owner=root group=root
+  tags:
+    - scored
+    - section9.1
+    - section9.1.6
+
+- name: 9.1.7 Verify User/Group Ownership on /etc/shadow (Scored)
+  file: path=/etc/shadow owner=root group=root
+  tags:
+    - scored
+    - section9.1
+    - section9.1.7
+
+- name: 9.1.8 Verify User/Group Ownership on /etc/gshadow (Scored)
+  file: path=/etc/gshadow owner=root group=root
+  tags:
+    - scored
+    - section9.1
+    - section9.1.8
+
+- name: 9.1.9 Verify User/Group Ownership on /etc/group (Scored)
+  file: path=/etc/group owner=root group=root
+  tags:
+    - scored
+    - section9.1
+    - section9.1.9
+
+- name: 9.1.10 Find World Writable Files (Not Scored)
+  shell: "df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -type f -perm -0002"
+  register: cis_9_1_10_result
+  changed_when: false
+  failed_when: cis_9_1_10_result.stdout_lines.0 is defined
+  tags:
+    - notscored
+    - section9.1
+    - section9.1.10
+
+- name: 9.1.11 Find Un-owned Files and Directories (Scored)
+  shell: "df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nouser -ls"
+  register: cis_9_1_11_result
+  changed_when: false
+  failed_when: cis_9_1_11_result.stdout_lines.0 is defined
+  become: true
+  become_user: root
+  tags:
+    - scored
+    - section9.1
+    - section9.1.11
+
+- name: 9.1.12 Find Un-grouped Files and Directories (Scored)
+  shell: "df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nogroup -ls"
+  register: cis_9_1_12_result
+  changed_when: false
+  failed_when: cis_9_1_12_result.stdout_lines.0 is defined
+  become: True
+  become_user: root
+  tags:
+    - scored
+    - section9.1
+    - section9.1.12
+
+- name: 9.1.13 SUID System Executable Exclude list
+  set_fact:
+    cis_9_1_13_exclude_list:
+      - /usr/lib/polkit-1/polkit-agent-helper-1
+      - /usr/bin/pkexec
+      - /usr/bin/chsh
+      - /usr/bin/passwd
+      - /usr/bin/sudo
+      - /usr/bin/mount
+      - /usr/bin/su
+      - /usr/bin/crontab
+      - /usr/bin/newgrp
+      - /usr/bin/chage
+      - /usr/bin/chfn
+      - /usr/bin/gpasswd
+      - /usr/bin/umount
+      - /usr/lib64/dbus-1/dbus-daemon-launch-helper
+      - /usr/sbin/usernetctl
+      - /usr/sbin/unix_chkpwd
+      - /usr/sbin/pam_timestamp_check
+      - /usr/bin/at
+      - /usr/sbin/mount.nfs
+    alawys_run: true
+    tags:
+      - notscored
+      - section9.1
+      - section9.1.13
+
+- name: 9.1.13 Find SUID System Executables (Not Scored)
+  shell: "df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -type f -perm -4000 -print"
+  register: cis_9_1_13_output
+  become: True
+  become_user: root
+  changed_when: false
+  become: True
+  become_user: root
+  tags:
+    - notscored
+    - section9.1
+    - section9.1.13
+
+- name: 9.1.13 SUID System Executable error
+  fail: "'{{ item }}' is not in the exclude list"
+  when: item not in cis_9_1_13_exclude_list
+  with_items: cis_9_1_13_output.stdout_lines
+  tags:
+    - notscored
+    - section9.1
+    - section9.1.13
+
+- name: 9.1.14 Find SGID System Executables (Not Scored)
+  set_fact:
+    cis_9_1_14_exclude_list:
+      - ..?......  c /etc/sudo-ldap.conf
+      - ..?......  c /etc/sudo.conf
+      - S.?....T.  c /etc/sudoers
+      - ..?......    /usr/bin/sudo
+      - ..?......    /usr/bin/sudoreplay
+      - S.5....T.  c /etc/sudoers
+    alawys_run: true
+    tags:
+      - notscored
+      - section9.1
+      - section9.1.14
+
+- name: 9.1.14 Find SGID System Executables (Not Scored)
+  shell: '/bin/rpm -V `/bin/rpm -qf /usr/bin/sudo`'
+  register: cis_9_1_14_output
+  #the command automatically gives an RC of 1
+  failed_when: cis_9_1_14_output.rc != 0 and cis_9_1_14_output.rc != 1
+  become: True
+  become_user: root
+  tags:
+    - notscored
+    - section9.1
+    - section9.1.14
+
+- name: 9.1.14 Invalid Executables
+  fail: "Investigate manually!"
+  when: item not in cis_9_1_14_exclude_list
+  with_items: cis_9_1_14_output.stdout_lines
+  tags:
+    - notscored
+    - section9.1
+    - section9.1.14
+
+- name: 9.2.1 Ensure Password Fields are Not Empty (Scored)
+  shell: /bin/cat /etc/shadow | /bin/awk -F':' '($2 == "" ) { print $1 " does not have a password "}'
+  register: result9_2_1
+  changed_when: "result9_2_1.stdout"
+  always_run: yes
+  tags:
+    - scored
+    - section9.2
+    - section9.2.1
+
+- name: 9.2.2 Verify No Legacy "+" Entries Exist in /etc/passwd File (Scored)
+  shell: /bin/grep '^+:' /etc/passwd
+  register: result9_2_2
+  failed_when: result9_2_2.rc == 0
+  changed_when: result9_2_2.rc == 0
+  tags:
+    - scored
+    - section9.2
+    - section9.2.2
+
+- name: 9.2.3 Verify No Legacy "+" Entries Exist in /etc/shadow File (Scored)
+  shell: /bin/grep '^+:' /etc/shadow
+  register: result9_2_3
+  failed_when: result9_2_3.rc == 0
+  changed_when: result9_2_3.rc == 0
+  tags:
+    - scored
+    - section9.2
+    - section9.2.3
+
+- name: 9.2.4 Verify No Legacy "+" Entries Exist in /etc/group File (Scored)
+  shell: /bin/grep '^+:' /etc/group
+  register: result9_2_4
+  failed_when: result9_2_4.rc == 0
+  changed_when: result9_2_4.rc == 0
+  tags:
+    - scored
+    - section9.2
+    - section9.2.4
+
+- name: 9.2.5 Verify No UID 0 Accounts Exist Other Than root (Scored)
+  shell: /bin/awk -F':' '($3 == 0) { print $1 }' /etc/passwd | grep -qx 'root'
+  register: result9_2_5
+  failed_when: result9_2_5.rc != 0
+  changed_when: result9_2_5.rc != 0
+  tags:
+    - scored
+    - section9.2
+    - section9.2.5
+
+- name: 9.2.6 Create tmp file for script
+  command: /bin/mktemp /tmp/ansible_cis.XXXX
+  register: cis_9_2_6_remote_script
+  changed_when: False
+  failed_when: cis_9_2_6_remote_script.rc != 0
+  always_run: true
+  tags:
+  - scored
+  - section9.2
+  - section9.2.6
+
+- name: 9.2.6 Copying cis_9_2_6.sh to remote host
+  copy: src=scripts/cis_9_2_6.sh dest="{{ cis_9_2_6_remote_script.stdout }}" mode=0600
+  changed_when: False
+  always_run: true
+  tags:
+    - scored
+    - section9.2
+    - section9.2.6
+
+- name: 9.2.6 Ensure root PATH Integrity (Scored)
+  command: /bin/bash -eu {{ cis_9_2_6_remote_script.stdout }}
+  register: cis_9_2_6_remote_execute
+  changed_when: False
+  failed_when: cis_9_2_8_remote_execute.rc != 0 or cis_9_2_8_remote_execute.stdout_lines.0 is defined
+  tags:
+    - scored
+    - section9.2
+    - section9.2.8
+
+- name: 9.2.6 Cleanup
+  file: path={{ cis_9_2_6_remote_script.stdout }} state=absent
+  changed_when: False
+  tags:
+    - scored
+    - section9.2
+    - section9.2.6
+
+- name: 9.2.7 Check Permissions on User Home Directories (Scored)
+  file: path='{{ item }}' mode=600 state=directory
+  with_items: cis_users.stdout_lines
+  when: item not in cis_users_exclude_list
+  tags:
+    - scored
+    - section9.2
+    - section9.2.7
+
+- name: 9.2.8 Create tmp file for user dot file script
+  command: /bin/mktemp /tmp/ansible_cis.XXXX
+  register: cis_9_2_8_remote_script
+  changed_when: False
+  failed_when: cis_9_2_8_remote_script.rc != 0
+  always_run: true
+  tags:
+  - scored
+  - section9.2
+  - section9.2.8
+
+- name: 9.2.8 Copying user_dot_files.sh to remote host
+  copy: src=scripts/user_dot_files.sh dest="{{ cis_9_2_8_remote_script.stdout }}" mode=0600
+  changed_when: False
+  always_run: true
+  tags:
+    - scored
+    - section9.2
+    - section9.2.8
+
+- name: 9.2.8 Check User Dot File Permissions - Getting Dot Files(Scored)
+  command: /bin/bash -eu {{ cis_9_2_8_remote_script.stdout }}
+  register: cis_9_2_8_remote_execute
+  changed_when: False
+  failed_when: cis_9_2_8_remote_execute.rc != 0 or cis_9_2_8_remote_execute.stdout_lines.0 is defined
+  tags:
+    - scored
+    - section9.2
+    - section9.2.8
+
+- name: 9.2.8 Verify Dot File permissions
+  file: path='{{ item }}' mode="g-w,o-w"
+  when: cis_9_2_8_remote_execute.stdout_lines.0 is defined
+  with_items:
+    - cis_9_2_8_remote_execute.stdout_lines
+  tags:
+    - scored
+    - section9.2
+    - section9.2.8
+
+- name: 9.2.8 Cleanup
+  file: path={{ cis_9_2_8_remote_script.stdout }} state=absent
+  changed_when: False
+  tags:
+    - scored
+    - section9.2
+    - section9.2.8
+
+- name: 9.2.9 Check Permissions on User .netrc Files (Scored)
+  stat: path=~{{ item }}/.netrc
+  with_items: cis_users.stdout_lines
+  when: item not in cis_users_exclude_list
+  register: cis_9_2_9_result
+  become: True
+  become_user: root
+  tags:
+    - scored
+    - section9.2
+    - section9.2.9
+
+- name: 9.2.10 Check for Presence of User .rhosts Files (Scored)
+  file: state=absent dest=~{{ item }}/.rhosts
+  with_items: cis_users.stdout_lines
+  become: True
+  become_user: root
+  tags:
+    - scored
+    - section9.2
+    - section9.2.10
+
+- name: 9.2.11 Create tmp file for group diff script
+  command: /bin/mktemp /tmp/ansible_cis.XXXX
+  register: cis_9_2_11_remote_script
+  changed_when: False
+  failed_when: cis_9_2_11_remote_script.rc != 0
+  always_run: true
+  tags:
+  - scored
+  - section9.2
+  - section9.2.11
+
+- name: 9.2.11 Copying group_diff.sh to remote host
+  copy: src=scripts/group_diff.sh dest="{{ cis_9_2_11_remote_script.stdout }}" mode=0600
+  changed_when: False
+  tags:
+    - scored
+    - section9.2
+    - section9.2.11
+
+- name: 9.2.11 Check Groups in /etc/passwd (Scored)
+  command: /bin/bash -eu {{ cis_9_2_11_remote_script.stdout }}
+  register: cis_9_2_11_remote_execute
+  changed_when: False
+  failed_when: cis_9_2_11_remote_execute.rc != 0 or cis_9_2_11_remote_execute.stdout_lines.0 is defined
+  tags:
+    - scored
+    - section9.2
+    - section9.2.11
+
+- name: 9.2.11 Cleanup
+  file: path={{ cis_9_2_11_remote_script.stdout }} state=absent
+  changed_when: False
+  tags:
+    - scored
+    - section9.2
+    - section9.2.11
+
+- name: 9.2.12 Check That Users Are Assigned Valid Home Directories (Scored)
+  stat: path=~{{ item }}
+  with_items:  cis_users.stdout_lines
+  register: cis_9_2_12_result
+  when: item not in cis_users_exclude_list
+  failed_when: cis_9_2_12_result is defined and cis_9_2_12_result.stat.isdir == False and item not in cis_users_exclude_list
+  tags:
+    - scored
+    - section9.2
+    - section9.2.12
+
+- name: 9.2.13 Create tmp file for home directory ownership script
+  command: /bin/mktemp /tmp/ansible_cis.XXXX
+  register: cis_9_2_13_remote_script
+  changed_when: False
+  failed_when: cis_9_2_13_remote_script.rc != 0
+  always_run: true
+  tags:
+  - scored
+  - section9.2
+  - section9.2.13
+
+- name: 9.2.13 Copying home_ownership.sh to remote host
+  copy: src=scripts/home_ownership.sh dest="{{ cis_9_2_13_remote_script.stdout }}" mode=0600
+  changed_when: False
+  always_run: true
+  tags:
+    - scored
+    - section9.2
+    - section9.2.13
+
+- name: 9.2.13 Check User Home Directory Ownership (Scored)
+  command: /bin/bash -eu {{ cis_9_2_13_remote_script.stdout }}
+  register: cis_9_2_13_remote_execute
+  failed_when: cis_9_2_13_remote_execute.rc != 0 or cis_9_2_13_remote_execute.stdout_lines.0 is defined
+  changed_when: false
+  tags:
+    - scored
+    - section9.2
+    - section9.2.13
+
+- name: 9.2.13 Cleanup
+  file: path={{ cis_9_2_13_remote_script.stdout }} state=absent
+  changed_when: False
+  tags:
+    - scored
+    - section9.2
+    - section9.2.13
+
+- name: 9.2.14 Check for Duplicate UIDs (Scored)
+  shell: for dupeID in  $(cut -f3 -d":" /etc/passwd | sort | uniq -c | sort -n | awk ' $1 > 1 {print $2}'); do awk -F':' -v dupeid=$dupeID '$3 == dupeid {print $1}' /etc/passwd   ; done
+  register: dupe_UIDs
+  changed_when: false
+  tags:
+    - scored
+    - section9.2
+    - section9.2.14
+
+- name: 9.2.15 Check for Duplicate GIDs (Scored)
+  shell: for dupeID in  $(cut -f3 -d":" /etc/group | sort | uniq -c | sort -n | awk ' $1 > 1 {print $2}'); do awk -F':' -v dupeid=$dupeID '$3 == dupeid {print $1}' /etc/group   ; done
+  register: result9_2_15
+  changed_when: "result9_2_15.stdout"
+  always_run: yes
+  tags:
+    - scored
+    - check-only
+    - section9.2
+    - section9.2.15
+
+- name: 9.2.16 Check for Duplicate User Names (Scored)
+  shell: cut -f1 -d':' /etc/passwd | sort | uniq -c | sort -n | awk ' $1 > 1 {print $2}'
+  register: result9_2_16
+  changed_when: "result9_2_16.stdout"
+  always_run: yes
+  tags:
+    - scored
+    - check-only
+    - section9.2
+    - section9.2.16
+
+- name: 9.2.17 Check for Duplicate Group Names (Scored)
+  shell: cut -f1 -d':' /etc/group | sort | uniq -c | sort -n | awk ' $1 > 1 {print $2}'
+  register: result9_2_17
+  changed_when: "result9_2_17.stdout"
+  always_run: yes
+  tags:
+    - scored
+    - check-only
+    - section9.2
+    - section9.2.17
+
+- name: 9.2.18 Check for Presence of User .netrc Files (Scored)
+  shell:  for h in $(/bin/awk -F':' '$7 !~ /\/sbin\/nologin/ && $7 !~ /\/bin\/false/ { print $6 }' /etc/passwd); do if [[ -f $h/.netrc && -s $h/.netrc ]]; then echo $h; fi ; done
+  register: result9_2_18
+  changed_when: "result9_2_18.stdout"
+  always_run: yes
+  tags:
+    - scored
+    - check-only
+    - section9.2
+    - section9.2.18
+
+- name: 9.2.19 Check for Presence of User .forward Files (Scored)
+  shell:  for h in $(/bin/awk -F':' '$7 !~ /\/sbin\/nologin/ && $7 !~ /\/bin\/false/ { print $6 }' /etc/passwd); do if [[ -f $h/.forward && -s $h/.forward ]]; then echo $h; fi ; done
+  register: result9_2_19
+  changed_when: "result9_2_19.stdout"
+  always_run: yes
+  tags:
+    - scored
+    - check-only
+    - section9.2
+    - section9.2.19
+
+#  - debug: var=result9_2_19.stdout
+#    tags:
+#      - section9.2.19

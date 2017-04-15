@@ -1,0 +1,43 @@
+---
+
+- name: CIS prelim list users exclude list
+  set_fact:
+    cis_users_exclude_list:
+      - tss
+      - bin
+      - sync
+      - daemon
+      - shutdown
+      - halt
+    tags:
+    - cis_prelim
+    - cis_prelim_users
+
+# List users in order to look files inside each home directory
+- name: CIS prelim list local users
+  command: cut -f1 -d":" /etc/passwd
+  register: cis_users
+  changed_when: false
+  always_run: yes
+  tags:
+  - cis_prelim
+  - cis_prelim_users
+
+- name: CIS Prelim local file system types (Set local fstypes)
+  set_fact: cis_local_fstypes="[ 'ext3', 'ext4', 'xfs', 'tmpfs' ]"
+  changed_when: false
+  always_run: yes
+  tags:
+  - cis_prelim
+  - cis_preim_local_fs
+
+- name: CIS prelim local file systems (data collection)
+  shell: echo {{ item.mount }}
+  when: item.fstype in cis_local_fstypes
+  with_items: ansible_mounts
+  register: cis_local_fs
+  changed_when: false
+  always_run: yes
+  tags:
+  - cis_prelim
+  - cis_prelim_local_fs

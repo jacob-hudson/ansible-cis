@@ -1,2 +1,15 @@
 ---
-# handlers file for cis
+- name: Reload auditd Rules
+  service: name=auditd state=restarted
+  become: True
+  become_user: root
+
+- name: Reload prelinking
+  command: /usr/sbin/prelink -ua
+  become: True
+  become_user: root
+
+- name: Reload sshd
+  service: name=sshd state=restarted
+  become: True
+  become_user: root

@@ -1,0 +1,72 @@
+---
+
+- name: 5.1.1 Install the rsyslog package (Scored)
+  yum: name=rsyslog state=installed
+  tags:
+    - scored
+    - section5.1
+    - section5.1.1
+
+- name: 5.1.2 Activate the rsyslog Service (Scored)
+  service: name=rsyslog enabled=yes state=started
+  tags:
+    - scored
+    - section5.1
+    - section5.1.2
+
+- name: 5.1.3 Configure /etc/rsyslog.conf (Not Scored)
+  copy: src=etc/rsyslog.conf dest=/etc/rsyslog.conf owner=root group=root mode=0644
+  become: true
+  become_user: root
+  tags:
+    - notscored
+    - section5.1
+    - section5.1.3
+
+- name: 5.1.4 Create and Set Permissions on rsyslog Log Files (Scored)
+  file: path=/var/log/{{ item }} state=touch owner=root group=wheel mode=0640
+  changed_when: false
+  become: true
+  become_user: root
+  with_items:
+      - messages
+      - kern.log
+      - daemon.log
+      - syslog
+      - unused.log
+  tags:
+    - scored
+    - section5.1
+    - section5.1.4
+
+- name: 5.1.5 Configure rsyslog to Send Logs to a Remote Log Host (Scored)
+  lineinfile: state=present dest=/etc/rsyslog.conf regexp="^\*\.\*" line="*.* @@{{ rsyslog_dest }}"
+  when: rsyslog_dest is defined
+  tags:
+    - scored
+    - section5.1
+    - section5.1.5
+
+- name: 5.1.6 Accept Remote rsyslog Messages Only on Designated Log Hosts (Not Scored)
+  lineinfile: state=present line="$ModLoad imtcp.so"
+  when: rsyslog_dest is defined
+  tags:
+    - notscored
+    - section5.1
+    - section5.1.6
+
+- name: 5.1.6 Accept Remote rsyslog Messages Only on Designated Log Hosts (Not Scored)
+  lineinfile: state=present line="$InputTCPServerRun 514"
+  when: rsyslog_dest is defined
+  tags:
+    - notscored
+    - section5.1
+    - section5.1.6
+
+- name: 5.3 Configure logrotate (Not Scored)
+  copy: src=etc/logrotate.d/syslog dest=/etc/logrotate.d/syslog
+  become: true
+  become_user: root
+  tags:
+    - notscored
+    - section5.3

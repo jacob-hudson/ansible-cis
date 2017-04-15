@@ -1,0 +1,937 @@
+---
+#TODO: Check out 1.1.11 - 1.1.13 (for external drives) and evaluate what to do
+
+- name: 1.1.1 Create Separate Partition for /tmp (Scored)
+  command:  grep "[[:space:]]/tmp[[:space:]]" /etc/fstab
+  register: tmp_fstab
+  changed_when: false
+  failed_when: tmp_fstab.stdout_lines.0 is undefined
+  tags:
+    - scored
+    - section1.1
+    - section1.1.1
+
+# Skip if likely vagrant because vagrant executes from /tmp
+- name: 1.1.2 - 1.1.4 Set nodev,nosuid,noexec option for /tmp Partition (Scored)
+  mount: name="/tmp" src={{ item.device }} state=mounted fstype={{ item.fstype }} opts="nodev,nosuid,noexec"
+  when: ( item.mount == '/tmp' ) and not ( ansible_virtualization_type == 'virtualbox' and ansible_virtualization_role == 'guest')
+  with_items: ansible_mounts
+  tags:
+    - scored
+    - section1.1
+    - section1.1.2
+    - section1.1.3
+    - section1.1.4
+
+- name: 1.1.5 Create Separate Partition for /var (Scored)
+  command:  grep "[[:space:]]/var[[:space:]]" /etc/fstab
+  register: var_fstab
+  changed_when: false
+  failed_when: var_fstab.stdout_lines.0 is undefined
+  tags:
+    - scored
+    - section1.1
+    - section1.1.5
+
+- name: 1.1.6 Bind Mount the /var/tmp directory to /tmp (Scored)
+  mount: name="/var/tmp" src="/tmp" state=mounted fstype="none" opts="bind"
+  when: item.mount == '/tmp'
+  with_items: ansible_mounts
+  become: True
+  become_user: root
+  tags:
+    - scored
+    - section1.1
+    - section1.1.6
+
+- name: 1.1.7 Create Separate Partition for /var/log (Scored)
+  command:  grep "[[:space:]]/var/log[[:space:]]" /etc/fstab
+  register: varlog_fstab
+  changed_when: false
+  failed_when: varlog_fstab.stdout_lines.0 is undefined
+  tags:
+    - scored
+    - section1.1
+    - section1.1.7
+
+- name: 1.1.8 Create Separate Partition for /var/log/audit (Scored)
+  command:  grep "[[:space:]]/var/log/audit[[:space:]]" /etc/fstab
+  register: varlogaudit_fstab
+  changed_when: false
+  failed_when: varlogaudit_fstab.stdout_lines.0 is undefined
+  tags:
+    - scored
+    - section1.1
+    - section1.1.8
+
+- name: 1.1.9 Create Separate Partition for /home (Scored)
+  command:  grep "[[:space:]]/home[[:space:]]" /etc/fstab
+  register: home_fstab
+  changed_when: false
+  failed_when: home_fstab.stdout_lines.0 is undefined
+  tags:
+    - scored
+    - section1.1
+    - section1.1.9
+
+- name: 1.1.10 Add nodev Option to /home Partition (Scored)
+  mount: name="/home" src={{ item.device }} state=mounted fstype={{ item.fstype }} opts="nodev"
+  when: item.mount == '/home'
+  with_items: ansible_mounts
+  become: True
+  become_user: root
+  tags:
+    - scored
+    - section1.1
+    - section1.1.10
+
+- name: 1.1.11 Add nodev Option to Removable Media Partitions (Not Scored)
+  debug: msg="*** Not relevant."
+  tags:
+    - scored
+    - section1.1
+    - section1.1.11
+
+- name: 1.1.12 Add noexec Option to Removable Media Partitions (Not Scored)
+  debug: msg="*** Not relevant."
+  tags:
+    - notscored
+    - section1.1
+    - section1.1.12
+
+- name: 1.1.13 Add nosuid Option to Removable Media Partitions (Not Scored)
+  debug: msg="*** Not relevant."
+  tags:
+    - notscored
+    - section1.1
+    - section1.1.13
+
+- name: 1.1.14 - 1.1.16 Add noexec Option to /dev/shm Partition (Scored)
+  mount: name="/dev/shm" src="none" state=mounted fstype="tmpfs" opts="nodev,nosuid,noexec"
+  become: True
+  become_user: root
+  tags:
+    - section1.1
+    - section1.1.14
+    - section1.1.15
+    - section1.1.16
+    - scored
+
+- name: 1.1.17 Set sticky bit on all world-writeable directories (facts)
+  set_fact:
+    cis_1_1_17_local_filesystems:
+      - ext3
+      - ext4
+      - btrfs
+      - reiserfs
+      - xfs
+  changed_when: false
+  always_run: yes
+  tags:
+    - scored
+    - section1.1
+    - section1.1.17
+
+- name: 1.1.17 Set sticky bit on all world-writeable directories (data collection)
+  command: "find {{ item.mount }} -mount -type d ( -perm -0002 -a ! -perm -1000 ) -print"
+  when: item.fstype == "ext4"
+  register: cis_1_1_17_find_wwdirs
+  with_items: ansible_mounts
+  changed_when: false
+  always_run: yes
+  become: true
+  become_user: root
+  tags:
+      - scored
+      - section1.1
+      - section1.1.17
+
+- name: 1.1.17 Set sticky bit on all world-writeable directories (Scored)
+  file: dest={{ item }} state=directory mode="o+t" recurse=no
+  with_items:
+    - cis_1_1_17_find_wwdirs
+  tags:
+    - scored
+    - section1.1
+    - section1.1.17
+
+- name: 1.2.1 Configure Connection to the RHN RPM repositories (Not Scored)
+  command: yum check-update
+  register: result
+  changed_when: result.stdout_lines is undefined
+  failed_when: "result.rc == 1"
+  when: ansible_distribution == "RedHat"
+  tags:
+    - notscored
+    - section1.2
+    - section1.2.1
+
+- name: 1.2.2 Verify Red Hat GPG key is installed (Scored)
+  command: gpg --quiet --with-fingerprint /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+  changed_when: false
+  when: ansible_distribution == "RedHat"
+  tags:
+    - scored
+    - section1.2
+    - section1.2.2
+
+- name: 1.2.3 Verify that gpgcheck is Globally Activated (Scored)
+  lineinfile: state=present dest=/etc/yum.conf regexp=^gpgcheck= line=gpgcheck=1
+  tags:
+    - scored
+    - section1.2
+    - section1.2.3
+
+- name: 1.2.5 Obtain software package updates with yum (Not Scored)
+  yum: name=*
+  tags:
+    - notscored
+    - section1.2
+    - section1.2.5
+
+- name: 1.2.6 Verify package integrity using RPM (exception list - default)
+  set_fact:
+    cis_1_2_6_exceptions_default:
+      - /etc/cron.daily
+      - /etc/cron.hourly
+      - /etc/cron.d
+      - /etc/cron.daily
+      - /etc/cron.hourly
+      - /etc/cron.monthly
+      - /etc/cron.weekly
+      - /etc/inittab
+      - /var/run/wpa_supplicant
+      - /lib/modules/3.10.0-229.14.1.el7.x86_64/modules.devname
+      - /lib/modules/3.10.0-229.14.1.el7.x86_64/modules.softdep
+      - /lib/modules/3.10.0-229.el7.x86_64/modules.softdep
+      - /lib/modules/3.10.0-229.el7.x86_64/modules.devname
+  changed_when: false
+  always_run: true
+  tags:
+  - notscored
+  - section1.2
+  - section1.2.6
+
+- name: 1.2.6 Verify package integrity using RPM (exception list - hybris)
+  set_fact:
+    cis_1_2_6_exceptions_hybris:
+      - /opt
+      - /usr/local
+      - /usr/bin
+      - /usr/sbin
+      - /usr/sbin/build-locale-archive
+      - /var/spool/at/spool
+      - /usr/bin/ssh-agent
+      - /usr/bin/sudo
+      - /usr/bin/sudoreplay
+      - /usr/sbin/iprdbg
+      - /usr/lib/node_modules/inherits
+      - /usr/sbin/groupadd
+      - /usr/sbin/groupdel
+      - /usr/sbin/groupmems
+      - /usr/sbin/groupmod
+      - /usr/sbin/useradd
+      - /usr/sbin/userdel
+      - /usr/sbin/usermod
+      - /etc/grub.d/README
+      - /var/run/wpa_supplicant
+      - /boot/System.map-3.10.0-229.20.1.el7.x86_64
+      - /lib/modules/3.10.0-229.20.1.el7.x86_64/modules.devname
+      - /lib/modules/3.10.0-229.20.1.el7.x86_64/modules.softdep
+      - /usr/sbin/redhat_lsb_trigger.x86_64
+      - /etc/firewalld/icmptypes
+      - /etc/firewalld/services
+      - /etc/firewalld/zones
+      - /usr/lib/firewalld/icmptypes
+      - /usr/lib/firewalld/icmptypes/destination-unreachable.xml
+      - /usr/lib/firewalld/icmptypes/echo-reply.xml
+      - /usr/lib/firewalld/icmptypes/echo-request.xml
+      - /usr/lib/firewalld/icmptypes/parameter-problem.xml
+      - /usr/lib/firewalld/icmptypes/redirect.xml
+      - /usr/lib/firewalld/icmptypes/router-advertisement.xml
+      - /usr/lib/firewalld/icmptypes/router-solicitation.xml
+      - /usr/lib/firewalld/icmptypes/source-quench.xml
+      - /usr/lib/firewalld/icmptypes/time-exceeded.xml
+      - /usr/lib/firewalld/services
+      - /usr/lib/firewalld/services/RH-Satellite-6.xml
+      - /usr/lib/firewalld/services/amanda-client.xml
+      - /usr/lib/firewalld/services/bacula-client.xml
+      - /usr/lib/firewalld/services/bacula.xml
+      - /usr/lib/firewalld/services/dhcp.xml
+      - /usr/lib/firewalld/services/dhcpv6-client.xml
+      - /usr/lib/firewalld/services/dhcpv6.xml
+      - /usr/lib/firewalld/services/dns.xml
+      - /usr/lib/firewalld/services/ftp.xml
+      - /usr/lib/firewalld/services/high-availability.xml
+      - /usr/lib/firewalld/services/http.xml
+      - /usr/lib/firewalld/services/https.xml
+      - /usr/lib/firewalld/services/imaps.xml
+      - /usr/lib/firewalld/services/ipp-client.xml
+      - /usr/lib/firewalld/services/ipp.xml
+      - /usr/lib/firewalld/services/ipsec.xml
+      - /usr/lib/firewalld/services/kerberos.xml
+      - /usr/lib/firewalld/services/kpasswd.xml
+      - /usr/lib/firewalld/services/ldap.xml
+      - /usr/lib/firewalld/services/ldaps.xml
+      - /usr/lib/firewalld/services/libvirt-tls.xml
+      - /usr/lib/firewalld/services/libvirt.xml
+      - /usr/lib/firewalld/services/mdns.xml
+      - /usr/lib/firewalld/services/mountd.xml
+      - /usr/lib/firewalld/services/ms-wbt.xml
+      - /usr/lib/firewalld/services/mysql.xml
+      - /usr/lib/firewalld/services/nfs.xml
+      - /usr/lib/firewalld/services/ntp.xml
+      - /usr/lib/firewalld/services/openvpn.xml
+      - /usr/lib/firewalld/services/pmcd.xml
+      - /usr/lib/firewalld/services/pmproxy.xml
+      - /usr/lib/firewalld/services/pmwebapi.xml
+      - /usr/lib/firewalld/services/pmwebapis.xml
+      - /usr/lib/firewalld/services/pop3s.xml
+      - /usr/lib/firewalld/services/postgresql.xml
+      - /usr/lib/firewalld/services/proxy-dhcp.xml
+      - /usr/lib/firewalld/services/radius.xml
+      - /usr/lib/firewalld/services/rpc-bind.xml
+      - /usr/lib/firewalld/services/samba-client.xml
+      - /usr/lib/firewalld/services/samba.xml
+      - /usr/lib/firewalld/services/smtp.xml
+      - /usr/lib/firewalld/services/ssh.xml
+      - /usr/lib/firewalld/services/telnet.xml
+      - /usr/lib/firewalld/services/tftp-client.xml
+      - /usr/lib/firewalld/services/tftp.xml
+      - /usr/lib/firewalld/services/transmission-client.xml
+      - /usr/lib/firewalld/services/vnc-server.xml
+      - /usr/lib/firewalld/services/wbem-https.xml
+      - /usr/lib/firewalld/zones
+      - /usr/lib/firewalld/zones/block.xml
+      - /usr/lib/firewalld/zones/dmz.xml
+      - /usr/lib/firewalld/zones/drop.xml
+      - /usr/lib/firewalld/zones/external.xml
+      - /usr/lib/firewalld/zones/home.xml
+      - /usr/lib/firewalld/zones/internal.xml
+      - /usr/lib/firewalld/zones/public.xml
+      - /usr/lib/firewalld/zones/trusted.xml
+      - /usr/lib/firewalld/zones/work.xml
+      - /etc/audisp/plugins.d
+      - /etc/audit/rules.d
+      - /sbin/audispd
+      - /sbin/auditctl
+      - /sbin/auditd
+      - /sbin/augenrules
+      - /sbin/autrace
+      - /usr/lib/systemd/system/auditd.service
+      - /usr/libexec/initscripts/legacy-actions/auditd/condrestart
+      - /usr/libexec/initscripts/legacy-actions/auditd/restart
+      - /usr/libexec/initscripts/legacy-actions/auditd/resume
+      - /usr/libexec/initscripts/legacy-actions/auditd/rotate
+      - /usr/libexec/initscripts/legacy-actions/auditd/stop
+      - /etc/selinux/targeted/modules/active/base.pp
+      - /etc/selinux/targeted/modules/active/commit_num
+      - /etc/selinux/targeted/modules/active/file_contexts
+      - /etc/selinux/targeted/modules/active/file_contexts.homedirs
+      - /etc/selinux/targeted/modules/active/file_contexts.template
+      - /etc/selinux/targeted/modules/active/homedir_template
+      - /etc/selinux/targeted/modules/active/modules
+      - /etc/selinux/targeted/modules/active/modules/abrt.pp
+      - /etc/selinux/targeted/modules/active/modules/accountsd.pp
+      - /etc/selinux/targeted/modules/active/modules/acct.pp
+      - /etc/selinux/targeted/modules/active/modules/afs.pp
+      - /etc/selinux/targeted/modules/active/modules/aiccu.pp
+      - /etc/selinux/targeted/modules/active/modules/aide.pp
+      - /etc/selinux/targeted/modules/active/modules/ajaxterm.pp
+      - /etc/selinux/targeted/modules/active/modules/alsa.pp
+      - /etc/selinux/targeted/modules/active/modules/amanda.pp
+      - /etc/selinux/targeted/modules/active/modules/amtu.pp
+      - /etc/selinux/targeted/modules/active/modules/anaconda.pp
+      - /etc/selinux/targeted/modules/active/modules/antivirus.pp
+      - /etc/selinux/targeted/modules/active/modules/apache.pp
+      - /etc/selinux/targeted/modules/active/modules/apcupsd.pp
+      - /etc/selinux/targeted/modules/active/modules/apm.pp
+      - /etc/selinux/targeted/modules/active/modules/application.pp
+      - /etc/selinux/targeted/modules/active/modules/arpwatch.pp
+      - /etc/selinux/targeted/modules/active/modules/asterisk.pp
+      - /etc/selinux/targeted/modules/active/modules/auditadm.pp
+      - /etc/selinux/targeted/modules/active/modules/authconfig.pp
+      - /etc/selinux/targeted/modules/active/modules/authlogin.pp
+      - /etc/selinux/targeted/modules/active/modules/automount.pp
+      - /etc/selinux/targeted/modules/active/modules/avahi.pp
+      - /etc/selinux/targeted/modules/active/modules/awstats.pp
+      - /etc/selinux/targeted/modules/active/modules/bacula.pp
+      - /etc/selinux/targeted/modules/active/modules/bcfg2.pp
+      - /etc/selinux/targeted/modules/active/modules/bind.pp
+      - /etc/selinux/targeted/modules/active/modules/bitlbee.pp
+      - /etc/selinux/targeted/modules/active/modules/blueman.pp
+      - /etc/selinux/targeted/modules/active/modules/bluetooth.pp
+      - /etc/selinux/targeted/modules/active/modules/boinc.pp
+      - /etc/selinux/targeted/modules/active/modules/bootloader.pp
+      - /etc/selinux/targeted/modules/active/modules/brctl.pp
+      - /etc/selinux/targeted/modules/active/modules/brltty.pp
+      - /etc/selinux/targeted/modules/active/modules/bugzilla.pp
+      - /etc/selinux/targeted/modules/active/modules/bumblebee.pp
+      - /etc/selinux/targeted/modules/active/modules/cachefilesd.pp
+      - /etc/selinux/targeted/modules/active/modules/calamaris.pp
+      - /etc/selinux/targeted/modules/active/modules/callweaver.pp
+      - /etc/selinux/targeted/modules/active/modules/canna.pp
+      - /etc/selinux/targeted/modules/active/modules/ccs.pp
+      - /etc/selinux/targeted/modules/active/modules/cdrecord.pp
+      - /etc/selinux/targeted/modules/active/modules/certmaster.pp
+      - /etc/selinux/targeted/modules/active/modules/certmonger.pp
+      - /etc/selinux/targeted/modules/active/modules/certwatch.pp
+      - /etc/selinux/targeted/modules/active/modules/cfengine.pp
+      - /etc/selinux/targeted/modules/active/modules/cgroup.pp
+      - /etc/selinux/targeted/modules/active/modules/chrome.pp
+      - /etc/selinux/targeted/modules/active/modules/chronyd.pp
+      - /etc/selinux/targeted/modules/active/modules/cinder.pp
+      - /etc/selinux/targeted/modules/active/modules/cipe.pp
+      - /etc/selinux/targeted/modules/active/modules/clock.pp
+      - /etc/selinux/targeted/modules/active/modules/clogd.pp
+      - /etc/selinux/targeted/modules/active/modules/cloudform.pp
+      - /etc/selinux/targeted/modules/active/modules/cmirrord.pp
+      - /etc/selinux/targeted/modules/active/modules/cobbler.pp
+      - /etc/selinux/targeted/modules/active/modules/cockpit.pp
+      - /etc/selinux/targeted/modules/active/modules/collectd.pp
+      - /etc/selinux/targeted/modules/active/modules/colord.pp
+      - /etc/selinux/targeted/modules/active/modules/comsat.pp
+      - /etc/selinux/targeted/modules/active/modules/condor.pp
+      - /etc/selinux/targeted/modules/active/modules/conman.pp
+      - /etc/selinux/targeted/modules/active/modules/consolekit.pp
+      - /etc/selinux/targeted/modules/active/modules/couchdb.pp
+      - /etc/selinux/targeted/modules/active/modules/courier.pp
+      - /etc/selinux/targeted/modules/active/modules/cpucontrol.pp
+      - /etc/selinux/targeted/modules/active/modules/cpufreqselector.pp
+      - /etc/selinux/targeted/modules/active/modules/cpuplug.pp
+      - /etc/selinux/targeted/modules/active/modules/cron.pp
+      - /etc/selinux/targeted/modules/active/modules/ctdb.pp
+      - /etc/selinux/targeted/modules/active/modules/cups.pp
+      - /etc/selinux/targeted/modules/active/modules/cvs.pp
+      - /etc/selinux/targeted/modules/active/modules/cyphesis.pp
+      - /etc/selinux/targeted/modules/active/modules/cyrus.pp
+      - /etc/selinux/targeted/modules/active/modules/daemontools.pp
+      - /etc/selinux/targeted/modules/active/modules/dbadm.pp
+      - /etc/selinux/targeted/modules/active/modules/dbskk.pp
+      - /etc/selinux/targeted/modules/active/modules/dbus.pp
+      - /etc/selinux/targeted/modules/active/modules/dcc.pp
+      - /etc/selinux/targeted/modules/active/modules/ddclient.pp
+      - /etc/selinux/targeted/modules/active/modules/denyhosts.pp
+      - /etc/selinux/targeted/modules/active/modules/devicekit.pp
+      - /etc/selinux/targeted/modules/active/modules/dhcp.pp
+      - /etc/selinux/targeted/modules/active/modules/dictd.pp
+      - /etc/selinux/targeted/modules/active/modules/dirsrv-admin.pp
+      - /etc/selinux/targeted/modules/active/modules/dirsrv.pp
+      - /etc/selinux/targeted/modules/active/modules/dmesg.pp
+      - /etc/selinux/targeted/modules/active/modules/dmidecode.pp
+      - /etc/selinux/targeted/modules/active/modules/dnsmasq.pp
+      - /etc/selinux/targeted/modules/active/modules/dnssec.pp
+      - /etc/selinux/targeted/modules/active/modules/docker.pp
+      - /etc/selinux/targeted/modules/active/modules/dovecot.pp
+      - /etc/selinux/targeted/modules/active/modules/drbd.pp
+      - /etc/selinux/targeted/modules/active/modules/dspam.pp
+      - /etc/selinux/targeted/modules/active/modules/entropyd.pp
+      - /etc/selinux/targeted/modules/active/modules/exim.pp
+      - /etc/selinux/targeted/modules/active/modules/fail2ban.pp
+      - /etc/selinux/targeted/modules/active/modules/fcoe.pp
+      - /etc/selinux/targeted/modules/active/modules/fetchmail.pp
+      - /etc/selinux/targeted/modules/active/modules/finger.pp
+      - /etc/selinux/targeted/modules/active/modules/firewalld.pp
+      - /etc/selinux/targeted/modules/active/modules/firewallgui.pp
+      - /etc/selinux/targeted/modules/active/modules/firstboot.pp
+      - /etc/selinux/targeted/modules/active/modules/fprintd.pp
+      - /etc/selinux/targeted/modules/active/modules/freeipmi.pp
+      - /etc/selinux/targeted/modules/active/modules/freqset.pp
+      - /etc/selinux/targeted/modules/active/modules/fstools.pp
+      - /etc/selinux/targeted/modules/active/modules/ftp.pp
+      - /etc/selinux/targeted/modules/active/modules/games.pp
+      - /etc/selinux/targeted/modules/active/modules/gdomap.pp
+      - /etc/selinux/targeted/modules/active/modules/gear.pp
+      - /etc/selinux/targeted/modules/active/modules/geoclue.pp
+      - /etc/selinux/targeted/modules/active/modules/getty.pp
+      - /etc/selinux/targeted/modules/active/modules/git.pp
+      - /etc/selinux/targeted/modules/active/modules/gitosis.pp
+      - /etc/selinux/targeted/modules/active/modules/glance.pp
+      - /etc/selinux/targeted/modules/active/modules/glusterd.pp
+      - /etc/selinux/targeted/modules/active/modules/gnome.pp
+      - /etc/selinux/targeted/modules/active/modules/gpg.pp
+      - /etc/selinux/targeted/modules/active/modules/gpm.pp
+      - /etc/selinux/targeted/modules/active/modules/gpsd.pp
+      - /etc/selinux/targeted/modules/active/modules/gssproxy.pp
+      - /etc/selinux/targeted/modules/active/modules/guest.pp
+      - /etc/selinux/targeted/modules/active/modules/hddtemp.pp
+      - /etc/selinux/targeted/modules/active/modules/hostname.pp
+      - /etc/selinux/targeted/modules/active/modules/hypervkvp.pp
+      - /etc/selinux/targeted/modules/active/modules/icecast.pp
+      - /etc/selinux/targeted/modules/active/modules/inetd.pp
+      - /etc/selinux/targeted/modules/active/modules/init.pp
+      - /etc/selinux/targeted/modules/active/modules/inn.pp
+      - /etc/selinux/targeted/modules/active/modules/iodine.pp
+      - /etc/selinux/targeted/modules/active/modules/iotop.pp
+      - /etc/selinux/targeted/modules/active/modules/ipa.pp
+      - /etc/selinux/targeted/modules/active/modules/ipsec.pp
+      - /etc/selinux/targeted/modules/active/modules/iptables.pp
+      - /etc/selinux/targeted/modules/active/modules/irc.pp
+      - /etc/selinux/targeted/modules/active/modules/irqbalance.pp
+      - /etc/selinux/targeted/modules/active/modules/iscsi.pp
+      - /etc/selinux/targeted/modules/active/modules/isns.pp
+      - /etc/selinux/targeted/modules/active/modules/jabber.pp
+      - /etc/selinux/targeted/modules/active/modules/jetty.pp
+      - /etc/selinux/targeted/modules/active/modules/jockey.pp
+      - /etc/selinux/targeted/modules/active/modules/journalctl.pp
+      - /etc/selinux/targeted/modules/active/modules/kdump.pp
+      - /etc/selinux/targeted/modules/active/modules/kdumpgui.pp
+      - /etc/selinux/targeted/modules/active/modules/keepalived.pp
+      - /etc/selinux/targeted/modules/active/modules/kerberos.pp
+      - /etc/selinux/targeted/modules/active/modules/keyboardd.pp
+      - /etc/selinux/targeted/modules/active/modules/keystone.pp
+      - /etc/selinux/targeted/modules/active/modules/kismet.pp
+      - /etc/selinux/targeted/modules/active/modules/kmscon.pp
+      - /etc/selinux/targeted/modules/active/modules/ksmtuned.pp
+      - /etc/selinux/targeted/modules/active/modules/ktalk.pp
+      - /etc/selinux/targeted/modules/active/modules/l2tp.pp
+      - /etc/selinux/targeted/modules/active/modules/ldap.pp
+      - /etc/selinux/targeted/modules/active/modules/libraries.pp
+      - /etc/selinux/targeted/modules/active/modules/likewise.pp
+      - /etc/selinux/targeted/modules/active/modules/linuxptp.pp
+      - /etc/selinux/targeted/modules/active/modules/lircd.pp
+      - /etc/selinux/targeted/modules/active/modules/livecd.pp
+      - /etc/selinux/targeted/modules/active/modules/lldpad.pp
+      - /etc/selinux/targeted/modules/active/modules/loadkeys.pp
+      - /etc/selinux/targeted/modules/active/modules/locallogin.pp
+      - /etc/selinux/targeted/modules/active/modules/lockdev.pp
+      - /etc/selinux/targeted/modules/active/modules/logadm.pp
+      - /etc/selinux/targeted/modules/active/modules/logging.pp
+      - /etc/selinux/targeted/modules/active/modules/logrotate.pp
+      - /etc/selinux/targeted/modules/active/modules/logwatch.pp
+      - /etc/selinux/targeted/modules/active/modules/lpd.pp
+      - /etc/selinux/targeted/modules/active/modules/lsm.pp
+      - /etc/selinux/targeted/modules/active/modules/lvm.pp
+      - /etc/selinux/targeted/modules/active/modules/mailman.pp
+      - /etc/selinux/targeted/modules/active/modules/mailscanner.pp
+      - /etc/selinux/targeted/modules/active/modules/man2html.pp
+      - /etc/selinux/targeted/modules/active/modules/mandb.pp
+      - /etc/selinux/targeted/modules/active/modules/mcelog.pp
+      - /etc/selinux/targeted/modules/active/modules/mediawiki.pp
+      - /etc/selinux/targeted/modules/active/modules/memcached.pp
+      - /etc/selinux/targeted/modules/active/modules/milter.pp
+      - /etc/selinux/targeted/modules/active/modules/minidlna.pp
+      - /etc/selinux/targeted/modules/active/modules/minissdpd.pp
+      - /etc/selinux/targeted/modules/active/modules/mip6d.pp
+      - /etc/selinux/targeted/modules/active/modules/mirrormanager.pp
+      - /etc/selinux/targeted/modules/active/modules/miscfiles.pp
+      - /etc/selinux/targeted/modules/active/modules/mock.pp
+      - /etc/selinux/targeted/modules/active/modules/modemmanager.pp
+      - /etc/selinux/targeted/modules/active/modules/modutils.pp
+      - /etc/selinux/targeted/modules/active/modules/mojomojo.pp
+      - /etc/selinux/targeted/modules/active/modules/mon_statd.pp
+      - /etc/selinux/targeted/modules/active/modules/mongodb.pp
+      - /etc/selinux/targeted/modules/active/modules/motion.pp
+      - /etc/selinux/targeted/modules/active/modules/mount.pp
+      - /etc/selinux/targeted/modules/active/modules/mozilla.pp
+      - /etc/selinux/targeted/modules/active/modules/mpd.pp
+      - /etc/selinux/targeted/modules/active/modules/mplayer.pp
+      - /etc/selinux/targeted/modules/active/modules/mrtg.pp
+      - /etc/selinux/targeted/modules/active/modules/mta.pp
+      - /etc/selinux/targeted/modules/active/modules/munin.pp
+      - /etc/selinux/targeted/modules/active/modules/mysql.pp
+      - /etc/selinux/targeted/modules/active/modules/mythtv.pp
+      - /etc/selinux/targeted/modules/active/modules/nagios.pp
+      - /etc/selinux/targeted/modules/active/modules/namespace.pp
+      - /etc/selinux/targeted/modules/active/modules/ncftool.pp
+      - /etc/selinux/targeted/modules/active/modules/netlabel.pp
+      - /etc/selinux/targeted/modules/active/modules/netutils.pp
+      - /etc/selinux/targeted/modules/active/modules/networkmanager.pp
+      - /etc/selinux/targeted/modules/active/modules/ninfod.pp
+      - /etc/selinux/targeted/modules/active/modules/nis.pp
+      - /etc/selinux/targeted/modules/active/modules/nova.pp
+      - /etc/selinux/targeted/modules/active/modules/nscd.pp
+      - /etc/selinux/targeted/modules/active/modules/nsd.pp
+      - /etc/selinux/targeted/modules/active/modules/nslcd.pp
+      - /etc/selinux/targeted/modules/active/modules/ntop.pp
+      - /etc/selinux/targeted/modules/active/modules/ntp.pp
+      - /etc/selinux/targeted/modules/active/modules/numad.pp
+      - /etc/selinux/targeted/modules/active/modules/nut.pp
+      - /etc/selinux/targeted/modules/active/modules/nx.pp
+      - /etc/selinux/targeted/modules/active/modules/obex.pp
+      - /etc/selinux/targeted/modules/active/modules/oddjob.pp
+      - /etc/selinux/targeted/modules/active/modules/openct.pp
+      - /etc/selinux/targeted/modules/active/modules/openhpid.pp
+      - /etc/selinux/targeted/modules/active/modules/openshift-origin.pp
+      - /etc/selinux/targeted/modules/active/modules/openshift.pp
+      - /etc/selinux/targeted/modules/active/modules/opensm.pp
+      - /etc/selinux/targeted/modules/active/modules/openvpn.pp
+      - /etc/selinux/targeted/modules/active/modules/openvswitch.pp
+      - /etc/selinux/targeted/modules/active/modules/openwsman.pp
+      - /etc/selinux/targeted/modules/active/modules/oracleasm.pp
+      - /etc/selinux/targeted/modules/active/modules/osad.pp
+      - /etc/selinux/targeted/modules/active/modules/pads.pp
+      - /etc/selinux/targeted/modules/active/modules/passenger.pp
+      - /etc/selinux/targeted/modules/active/modules/pcmcia.pp
+      - /etc/selinux/targeted/modules/active/modules/pcp.pp
+      - /etc/selinux/targeted/modules/active/modules/pcscd.pp
+      - /etc/selinux/targeted/modules/active/modules/pegasus.pp
+      - /etc/selinux/targeted/modules/active/modules/permissivedomains.pp
+      - /etc/selinux/targeted/modules/active/modules/pesign.pp
+      - /etc/selinux/targeted/modules/active/modules/pingd.pp
+      - /etc/selinux/targeted/modules/active/modules/piranha.pp
+      - /etc/selinux/targeted/modules/active/modules/pkcs.pp
+      - /etc/selinux/targeted/modules/active/modules/pki.pp
+      - /etc/selinux/targeted/modules/active/modules/plymouthd.pp
+      - /etc/selinux/targeted/modules/active/modules/podsleuth.pp
+      - /etc/selinux/targeted/modules/active/modules/policykit.pp
+      - /etc/selinux/targeted/modules/active/modules/polipo.pp
+      - /etc/selinux/targeted/modules/active/modules/portmap.pp
+      - /etc/selinux/targeted/modules/active/modules/portreserve.pp
+      - /etc/selinux/targeted/modules/active/modules/postfix.pp
+      - /etc/selinux/targeted/modules/active/modules/postgresql.pp
+      - /etc/selinux/targeted/modules/active/modules/postgrey.pp
+      - /etc/selinux/targeted/modules/active/modules/ppp.pp
+      - /etc/selinux/targeted/modules/active/modules/prelink.pp
+      - /etc/selinux/targeted/modules/active/modules/prelude.pp
+      - /etc/selinux/targeted/modules/active/modules/privoxy.pp
+      - /etc/selinux/targeted/modules/active/modules/procmail.pp
+      - /etc/selinux/targeted/modules/active/modules/prosody.pp
+      - /etc/selinux/targeted/modules/active/modules/psad.pp
+      - /etc/selinux/targeted/modules/active/modules/ptchown.pp
+      - /etc/selinux/targeted/modules/active/modules/publicfile.pp
+      - /etc/selinux/targeted/modules/active/modules/pulseaudio.pp
+      - /etc/selinux/targeted/modules/active/modules/puppet.pp
+      - /etc/selinux/targeted/modules/active/modules/pwauth.pp
+      - /etc/selinux/targeted/modules/active/modules/qmail.pp
+      - /etc/selinux/targeted/modules/active/modules/qpid.pp
+      - /etc/selinux/targeted/modules/active/modules/quantum.pp
+      - /etc/selinux/targeted/modules/active/modules/quota.pp
+      - /etc/selinux/targeted/modules/active/modules/rabbitmq.pp
+      - /etc/selinux/targeted/modules/active/modules/radius.pp
+      - /etc/selinux/targeted/modules/active/modules/radvd.pp
+      - /etc/selinux/targeted/modules/active/modules/raid.pp
+      - /etc/selinux/targeted/modules/active/modules/rasdaemon.pp
+      - /etc/selinux/targeted/modules/active/modules/rdisc.pp
+      - /etc/selinux/targeted/modules/active/modules/readahead.pp
+      - /etc/selinux/targeted/modules/active/modules/realmd.pp
+      - /etc/selinux/targeted/modules/active/modules/redis.pp
+      - /etc/selinux/targeted/modules/active/modules/remotelogin.pp
+      - /etc/selinux/targeted/modules/active/modules/rhcs.pp
+      - /etc/selinux/targeted/modules/active/modules/rhev.pp
+      - /etc/selinux/targeted/modules/active/modules/rhgb.pp
+      - /etc/selinux/targeted/modules/active/modules/rhnsd.pp
+      - /etc/selinux/targeted/modules/active/modules/rhsmcertd.pp
+      - /etc/selinux/targeted/modules/active/modules/ricci.pp
+      - /etc/selinux/targeted/modules/active/modules/rkhunter.pp
+      - /etc/selinux/targeted/modules/active/modules/rlogin.pp
+      - /etc/selinux/targeted/modules/active/modules/rngd.pp
+      - /etc/selinux/targeted/modules/active/modules/roundup.pp
+      - /etc/selinux/targeted/modules/active/modules/rpc.pp
+      - /etc/selinux/targeted/modules/active/modules/rpcbind.pp
+      - /etc/selinux/targeted/modules/active/modules/rpm.pp
+      - /etc/selinux/targeted/modules/active/modules/rshd.pp
+      - /etc/selinux/targeted/modules/active/modules/rssh.pp
+      - /etc/selinux/targeted/modules/active/modules/rsync.pp
+      - /etc/selinux/targeted/modules/active/modules/rtas.pp
+      - /etc/selinux/targeted/modules/active/modules/rtkit.pp
+      - /etc/selinux/targeted/modules/active/modules/rwho.pp
+      - /etc/selinux/targeted/modules/active/modules/samba.pp
+      - /etc/selinux/targeted/modules/active/modules/sambagui.pp
+      - /etc/selinux/targeted/modules/active/modules/sandboxX.pp
+      - /etc/selinux/targeted/modules/active/modules/sanlock.pp
+      - /etc/selinux/targeted/modules/active/modules/sasl.pp
+      - /etc/selinux/targeted/modules/active/modules/sblim.pp
+      - /etc/selinux/targeted/modules/active/modules/screen.pp
+      - /etc/selinux/targeted/modules/active/modules/secadm.pp
+      - /etc/selinux/targeted/modules/active/modules/sectoolm.pp
+      - /etc/selinux/targeted/modules/active/modules/selinuxutil.pp
+      - /etc/selinux/targeted/modules/active/modules/sendmail.pp
+      - /etc/selinux/targeted/modules/active/modules/sensord.pp
+      - /etc/selinux/targeted/modules/active/modules/setrans.pp
+      - /etc/selinux/targeted/modules/active/modules/setroubleshoot.pp
+      - /etc/selinux/targeted/modules/active/modules/seunshare.pp
+      - /etc/selinux/targeted/modules/active/modules/sge.pp
+      - /etc/selinux/targeted/modules/active/modules/shorewall.pp
+      - /etc/selinux/targeted/modules/active/modules/slocate.pp
+      - /etc/selinux/targeted/modules/active/modules/slpd.pp
+      - /etc/selinux/targeted/modules/active/modules/smartmon.pp
+      - /etc/selinux/targeted/modules/active/modules/smokeping.pp
+      - /etc/selinux/targeted/modules/active/modules/smoltclient.pp
+      - /etc/selinux/targeted/modules/active/modules/smsd.pp
+      - /etc/selinux/targeted/modules/active/modules/snapper.pp
+      - /etc/selinux/targeted/modules/active/modules/snmp.pp
+      - /etc/selinux/targeted/modules/active/modules/snort.pp
+      - /etc/selinux/targeted/modules/active/modules/sosreport.pp
+      - /etc/selinux/targeted/modules/active/modules/soundserver.pp
+      - /etc/selinux/targeted/modules/active/modules/spamassassin.pp
+      - /etc/selinux/targeted/modules/active/modules/speech-dispatcher.pp
+      - /etc/selinux/targeted/modules/active/modules/squid.pp
+      - /etc/selinux/targeted/modules/active/modules/ssh.pp
+      - /etc/selinux/targeted/modules/active/modules/sssd.pp
+      - /etc/selinux/targeted/modules/active/modules/staff.pp
+      - /etc/selinux/targeted/modules/active/modules/stapserver.pp
+      - /etc/selinux/targeted/modules/active/modules/stunnel.pp
+      - /etc/selinux/targeted/modules/active/modules/su.pp
+      - /etc/selinux/targeted/modules/active/modules/sudo.pp
+      - /etc/selinux/targeted/modules/active/modules/svnserve.pp
+      - /etc/selinux/targeted/modules/active/modules/swift.pp
+      - /etc/selinux/targeted/modules/active/modules/sysadm.pp
+      - /etc/selinux/targeted/modules/active/modules/sysadm_secadm.pp
+      - /etc/selinux/targeted/modules/active/modules/sysnetwork.pp
+      - /etc/selinux/targeted/modules/active/modules/sysstat.pp
+      - /etc/selinux/targeted/modules/active/modules/systemd.pp
+      - /etc/selinux/targeted/modules/active/modules/tcpd.pp
+      - /etc/selinux/targeted/modules/active/modules/tcsd.pp
+      - /etc/selinux/targeted/modules/active/modules/telepathy.pp
+      - /etc/selinux/targeted/modules/active/modules/telnet.pp
+      - /etc/selinux/targeted/modules/active/modules/tftp.pp
+      - /etc/selinux/targeted/modules/active/modules/tgtd.pp
+      - /etc/selinux/targeted/modules/active/modules/thin.pp
+      - /etc/selinux/targeted/modules/active/modules/thumb.pp
+      - /etc/selinux/targeted/modules/active/modules/tmpreaper.pp
+      - /etc/selinux/targeted/modules/active/modules/tomcat.pp
+      - /etc/selinux/targeted/modules/active/modules/tor.pp
+      - /etc/selinux/targeted/modules/active/modules/tuned.pp
+      - /etc/selinux/targeted/modules/active/modules/tvtime.pp
+      - /etc/selinux/targeted/modules/active/modules/udev.pp
+      - /etc/selinux/targeted/modules/active/modules/ulogd.pp
+      - /etc/selinux/targeted/modules/active/modules/uml.pp
+      - /etc/selinux/targeted/modules/active/modules/unconfined.pp
+      - /etc/selinux/targeted/modules/active/modules/unconfineduser.pp
+      - /etc/selinux/targeted/modules/active/modules/unlabelednet.pp
+      - /etc/selinux/targeted/modules/active/modules/unprivuser.pp
+      - /etc/selinux/targeted/modules/active/modules/updfstab.pp
+      - /etc/selinux/targeted/modules/active/modules/usbmodules.pp
+      - /etc/selinux/targeted/modules/active/modules/usbmuxd.pp
+      - /etc/selinux/targeted/modules/active/modules/userdomain.pp
+      - /etc/selinux/targeted/modules/active/modules/userhelper.pp
+      - /etc/selinux/targeted/modules/active/modules/usermanage.pp
+      - /etc/selinux/targeted/modules/active/modules/usernetctl.pp
+      - /etc/selinux/targeted/modules/active/modules/uucp.pp
+      - /etc/selinux/targeted/modules/active/modules/uuidd.pp
+      - /etc/selinux/targeted/modules/active/modules/varnishd.pp
+      - /etc/selinux/targeted/modules/active/modules/vdagent.pp
+      - /etc/selinux/targeted/modules/active/modules/vhostmd.pp
+      - /etc/selinux/targeted/modules/active/modules/virt.pp
+      - /etc/selinux/targeted/modules/active/modules/vlock.pp
+      - /etc/selinux/targeted/modules/active/modules/vmtools.pp
+      - /etc/selinux/targeted/modules/active/modules/vmware.pp
+      - /etc/selinux/targeted/modules/active/modules/vnstatd.pp
+      - /etc/selinux/targeted/modules/active/modules/vpn.pp
+      - /etc/selinux/targeted/modules/active/modules/w3c.pp
+      - /etc/selinux/targeted/modules/active/modules/watchdog.pp
+      - /etc/selinux/targeted/modules/active/modules/wdmd.pp
+      - /etc/selinux/targeted/modules/active/modules/webadm.pp
+      - /etc/selinux/targeted/modules/active/modules/webalizer.pp
+      - /etc/selinux/targeted/modules/active/modules/wine.pp
+      - /etc/selinux/targeted/modules/active/modules/wireshark.pp
+      - /etc/selinux/targeted/modules/active/modules/xen.pp
+      - /etc/selinux/targeted/modules/active/modules/xguest.pp
+      - /etc/selinux/targeted/modules/active/modules/xserver.pp
+      - /etc/selinux/targeted/modules/active/modules/zabbix.pp
+      - /etc/selinux/targeted/modules/active/modules/zarafa.pp
+      - /etc/selinux/targeted/modules/active/modules/zebra.pp
+      - /etc/selinux/targeted/modules/active/modules/zoneminder.pp
+      - /etc/selinux/targeted/modules/active/modules/zosremote.pp
+      - /etc/selinux/targeted/modules/active/netfilter_contexts
+      - /etc/selinux/targeted/modules/active/policy.kern
+      - /usr/sbin/unix_update
+      - /usr/bin/chfn
+      - /usr/bin/chsh
+      - /etc/cron.daily/logrotate
+      - /etc/dhcp/dhclient.d
+      - /etc/polkit-1/rules.d/50-default.rules
+      - /usr/sbin/glibc_post_upgrade.x86_64
+      - /var/lib/nfs/rpc_pipefs
+      - /var/lib/nfs/statd/sm
+      - /var/lib/nfs/statd/sm.bak
+      - /usr/libexec/utempter/utempter
+      - /usr/libexec/openssh/ssh-keysign
+      - /lib64/dbus-1/dbus-daemon-launch-helper
+      - /etc/polkit-1/localauthority/10-vendor.d
+      - /etc/polkit-1/localauthority/20-org.d
+      - /etc/polkit-1/localauthority/30-site.d
+      - /etc/polkit-1/localauthority/50-local.d
+      - /etc/polkit-1/localauthority/90-mandatory.d
+      - /var/lib/polkit-1/localauthority
+      - /var/lib/polkit-1/localauthority/10-vendor.d
+      - /var/lib/polkit-1/localauthority/20-org.d
+      - /var/lib/polkit-1/localauthority/30-site.d
+      - /var/lib/polkit-1/localauthority/50-local.d
+      - /var/lib/polkit-1/localauthority/90-mandatory.d
+  changed_when: false
+  always_run: true
+  tags:
+  - notscored
+  - section1.2
+  - section1.2.6
+
+- name: 1.2.6 Verify package integrity using RPM (exception list - default)
+  set_fact:
+    cis_1_2_6_exceptions_cis_role:
+      - /usr/sbin/aide
+      - /var/cache/httpd/ssl
+      - /etc/dhcp/dhclient.d/ntp.sh
+      - /etc/dhcp/dhclient.d/ntp.sh
+      - /etc/cron.hourly/0anacron
+      - /var/cache/httpd/proxy
+      - /usr/sbin/suexec
+      - /run/httpd/htcacheclean
+      - /etc/cron.daily/man-db.cron
+      - /etc/cron.daily/0yum-daily.cron
+      - /etc/cron.hourly/0yum-hourly.cron
+      - /etc/cron.d/0hourly
+  changed_when: false
+  always_run: true
+  tags:
+  - notscored
+  - section1.2
+  - section1.2.6
+
+- name:  1.2.6 Verify package integrity using RPM (exception list - add external)
+  set_fact:
+    cis_1_2_6_exceptions: '{{cis_1_2_6_exceptions|union(cis_1_2_6_exceptions_external)}}'
+  changed_when: false
+  when: cis_1_2_6_exceptions_external is defined
+  always_run: true
+  tags:
+  - notscored
+  - section1.2
+  - section1.2.6
+
+- name: 1.2.6 Verify package integrity using RPM (data collection)
+  shell: rpm -qVa | awk '$2 != "c" {print $2}'
+  register: cis_1_2_6_founditems
+  changed_when: false
+  always_run: true
+  tags:
+  - notscored
+  - section1.2
+  - section1.2.6
+
+- name: 1.2.6 Verify package integrity using RPM (Not Scored)
+  fail: msg=" {{item}} is listed in rpm -qVa, investigate manually"
+  changed_when: false
+  always_run: true
+  with_items: cis_1_2_6_founditems.stdout_lines
+  when: item not in cis_1_2_6_exceptions_default and item not in cis_1_2_6_exceptions_hybris and item not in cis_1_2_6_exceptions_cis_role
+  tags:
+    - notscored
+    - section1.2
+    - section1.2.6
+
+- name: 1.5.1 Set User/Group Owner on /etc/grub.conf (Scored)
+  file: path=/etc/grub.conf owner=root group=root
+  tags:
+    - scored
+    - section1.5
+    - section1.5.1
+  when: ansible_distribution_major_version == '6'
+
+
+- name: 1.5.1 Set User/Group Owner on /etc/grub.conf (Scored)
+  file: path=/boot/grub2/grub.cfg owner=root group=root
+  tags:
+    - scored
+    - section1.5
+    - section1.5.1
+  when: ansible_distribution_major_version == '7'
+
+- name: 1.5.2 Set Permissions on /etc/grub.conf (Scored)
+  file: path=/etc/grub.conf mode=0400
+  tags:
+    - scored
+    - section1.5
+    - section1.5.2
+  when: ansible_distribution_major_version == '6'
+
+#- name: 1.5.2 Set Permissions on /etc/grub.conf (Scored)
+#  file: path=/boot/grub2/grub.cfg mode=0400
+#  tags:
+#    - scored
+#    - section1.5
+#    - section1.5.2
+#  when: ansible_distribution_major_version == '7'
+
+- name: 1.5.3 Set boot loader password (Scored)
+  command: grep "^password" /boot/grub/grub.cfg
+  register: boot_password
+  changed_when: false
+  failed_when: boot_password.stdout_lines is undefined
+  tags:
+    - scored
+    - section1.5
+    - section1.5.3
+
+#1.5.4 is NOT in RHEL 7
+- name: 1.5.4 Require authentication for single-user mode (Scored)
+  shell: 'grep "^root:[*\!]:" /etc/shadow'
+  register: root_password_set
+  changed_when: false
+  failed_when: root_password_set is undefined
+  tags:
+    - scored
+    - section1.5
+    - section1.5.4
+
+- name: 1.5.5 Disable Interactive Boot (Scored)
+  lineinfile: dest=/etc/sysconfig/init regexp=^PROMPT= line=PROMPT=no
+  become: true
+  become_user: root
+  tags:
+    - scored
+    - section1.5
+    - section1.5.5
+
+- name: 1.6.1 Restrict core dumps (Scored) - via pam
+  lineinfile: dest=/etc/security/limits.conf line="* hard core 0" insertafter=EOF
+  become: true
+  become_user: root
+  tags:
+    - scored
+    - section1.6
+    - section1.6.1
+
+- name: 1.6.1 Restrict core dumps (Scored) - via sysctl
+  sysctl: name=fs.suid_dumpable value=0 state=present ignoreerrors=yes
+  become: true
+  become_user: root
+  tags:
+    - scored
+    - section1.6
+    - section1.6.1
+
+- name: 1.6.2 Configure ExecShield (Scored)
+  sysctl: name=kernel.exec-shield value=1 state=present ignoreerrors=yes
+  become: true
+  become_user: root
+  tags:
+    - scored
+    - section1.6
+    - section1.6.2
+  when: ansible_distribution_major_version == '6'
+
+- name: 1.6.3 Enable Randomized Virtual Memory Region Placement (Scored)
+  sysctl: name=kernel.randomize_va_space value=2 state=present ignoreerrors=yes
+  become: true
+  become_user: root
+  tags:
+    - scored
+    - section1.6
+    - section1.6.3
+
+- name: 1.7 Set list of "approved" OSes
+  set_fact:
+    cis_1_7_approved_os_list:
+      - Red Hat Enterprise Linux Server release 7.1 (Maipo)
+      - CentOS Linux release 7.1.1503 (Core)
+  tags:
+    - notscored
+    - section1.7
+
+- name: 1.7 Use the Latest OS Release (Not Scored)
+  command: echo {{ ansible_lsb.description }}
+  register: cis_1_7_result
+  changed_when: false
+  tags:
+    - notscored
+    - section1.7
+
+- name: 1.7 Unapproved OS!
+  fail: "{{ item }} is not an approved OS!"
+  with_items: cis_1_7_result.stdout_lines
+  when: item not in cis_1_7_approved_os_list
+  tags:
+    - notscored
+    - section1.7
